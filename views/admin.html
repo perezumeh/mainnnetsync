@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bot Configuration</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f0f23; color: #e0e0e0;
+            min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px;
+        }
+        .container {
+            background: #1a1a2e; border-radius: 12px; padding: 40px;
+            width: 100%; max-width: 600px; box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        h1 { color: #fff; margin-bottom: 8px; font-size: 24px; }
+        .subtitle { color: #888; margin-bottom: 30px; font-size: 14px; }
+        .form-group { margin-bottom: 24px; }
+        label { display: block; margin-bottom: 8px; color: #b0b0b0; font-size: 14px; font-weight: 500; }
+        input[type="text"], input[type="password"] {
+            width: 100%; padding: 12px 16px; background: #16213e;
+            border: 1px solid #0f3460; border-radius: 8px; color: #fff; font-size: 14px;
+        }
+        input:focus { outline: none; border-color: #e94560; }
+        .hint { font-size: 12px; color: #666; margin-top: 6px; }
+        .chat-ids-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+        .chat-id-tag {
+            background: #0f3460; color: #fff; padding: 6px 12px;
+            border-radius: 20px; font-size: 13px; display: flex; align-items: center; gap: 8px;
+        }
+        .chat-id-tag button {
+            background: none; border: none; color: #e94560; cursor: pointer;
+            font-size: 16px; line-height: 1; padding: 0; width: 18px; height: 18px;
+        }
+        .chat-id-tag button:hover { color: #ff6b6b; }
+        .add-chat-row { display: flex; gap: 10px; margin-top: 10px; }
+        .add-chat-row input { flex: 1; }
+        .btn {
+            padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer;
+            font-size: 14px; font-weight: 500; transition: all 0.2s;
+        }
+        .btn-primary { background: #e94560; color: #fff; }
+        .btn-primary:hover { background: #ff6b6b; }
+        .btn-secondary { background: #0f3460; color: #fff; }
+        .btn-secondary:hover { background: #1a4a7a; }
+        .actions { display: flex; gap: 12px; margin-top: 30px; padding-top: 20px; border-top: 1px solid #0f3460; }
+        .status {
+            margin-top: 16px; padding: 12px; border-radius: 8px; font-size: 14px; display: none;
+        }
+        .status.success { background: rgba(46,204,113,0.1); color: #2ecc71; border: 1px solid rgba(46,204,113,0.2); display: block; }
+        .status.error { background: rgba(233,69,96,0.1); color: #e94560; border: 1px solid rgba(233,69,96,0.2); display: block; }
+        .toggle-row {
+            display: flex; align-items: center; justify-content: space-between;
+            background: #16213e; padding: 16px; border-radius: 8px; border: 1px solid #0f3460;
+        }
+        .toggle-label { color: #fff; font-weight: 500; }
+        .toggle-sublabel { color: #888; font-size: 13px; margin-top: 4px; }
+        .switch { position: relative; display: inline-block; width: 50px; height: 26px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #0f3460; transition: .4s; border-radius: 26px;
+        }
+        .slider:before {
+            position: absolute; content: ""; height: 18px; width: 18px;
+            left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%;
+        }
+        input:checked + .slider { background-color: #e94560; }
+        input:checked + .slider:before { transform: translateX(24px); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Bot Configuration</h1>
+        <p class="subtitle">Manage your Telegram bot settings without touching code.</p>
+
+        <div class="form-group">
+            <label for="botToken">Bot Token</label>
+            <input type="password" id="botToken" placeholder="Enter your Telegram bot token...">
+            <p class="hint">Get this from @BotFather on Telegram.</p>
+        </div>
+
+        <div class="form-group">
+            <label>Chat IDs</label>
+            <div id="chatIdsList" class="chat-ids-list"></div>
+            <div class="add-chat-row">
+                <input type="text" id="newChatId" placeholder="Add chat ID (e.g., 123456789)">
+                <button class="btn btn-secondary" onclick="addChatId()">Add</button>
+            </div>
+            <p class="hint">Submissions will be broadcast to all listed chat IDs.</p>
+        </div>
+
+        <div class="form-group">
+            <div class="toggle-row">
+                <div>
+                    <div class="toggle-label">Telegram Notifications</div>
+                    <div class="toggle-sublabel">Send notifications when new submissions arrive</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="telegramToggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button class="btn btn-primary" onclick="saveConfig()">Save Configuration</button>
+            <button class="btn btn-secondary" onclick="loadConfig()">Reset</button>
+        </div>
+
+        <div id="status" class="status"></div>
+    </div>
+
+    <script>
+        let currentChatIds = [];
+
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/config');
+                const data = await res.json();
+                document.getElementById('botToken').value = data.telegram.botToken || '';
+                currentChatIds = data.telegram.chatIds || [];
+                renderChatIds();
+                document.getElementById('telegramToggle').checked = data.features.telegramNotifications;
+                showStatus('Configuration loaded', 'success');
+            } catch (err) {
+                showStatus('Failed to load configuration', 'error');
+            }
+        }
+
+        function renderChatIds() {
+            const list = document.getElementById('chatIdsList');
+            list.innerHTML = currentChatIds.map((id, index) => `
+                <div class="chat-id-tag">
+                    ${id}
+                    <button onclick="removeChatId(${index})" title="Remove">×</button>
+                </div>
+            `).join('');
+        }
+
+        function addChatId() {
+            const input = document.getElementById('newChatId');
+            const value = input.value.trim();
+            if (value && !currentChatIds.includes(value)) {
+                currentChatIds.push(value);
+                renderChatIds();
+                input.value = '';
+            }
+        }
+
+        function removeChatId(index) {
+            currentChatIds.splice(index, 1);
+            renderChatIds();
+        }
+
+        document.getElementById('newChatId').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addChatId();
+        });
+
+        async function saveConfig() {
+            const payload = {
+                botToken: document.getElementById('botToken').value.trim(),
+                chatIds: currentChatIds,
+                telegramNotifications: document.getElementById('telegramToggle').checked
+            };
+            try {
+                const res = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (data.success) showStatus('Configuration saved successfully!', 'success');
+                else showStatus(data.error || 'Failed to save', 'error');
+            } catch (err) {
+                showStatus('Failed to save configuration', 'error');
+            }
+        }
+
+        function showStatus(msg, type) {
+            const el = document.getElementById('status');
+            el.textContent = msg;
+            el.className = 'status ' + type;
+            setTimeout(() => { el.className = 'status'; }, 3000);
+        }
+
+        loadConfig();
+    </script>
+</body>
+</html>
